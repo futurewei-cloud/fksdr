@@ -183,7 +183,7 @@ update_primary()
    # Start a backup
    pred "starting application backup ..."
    kubectl annotate pv "$(kubectl -n vtest get pvc | awk '$3 ~/pvc/ { print $3 }')" tony.io/dr-protected-pv="Huawei-DR-Protected" --overwrite
-   /devhub/fksdr/velero.bin.v2 backup create $BACKUP --include-namespaces vtest --storage-location tony-storagelocation --volume-snapshot-locations tony-snapshotlocation
+   ../bin/velero backup create $BACKUP --include-namespaces vtest --storage-location tony-storagelocation --volume-snapshot-locations tony-snapshotlocation
    kubectl -n velero exec -ti `kubectl -n velero get pod | grep "^velero" | awk '{print $1}'` -- /bin/bash -c 'sync'
    pred "waiting backup data flush to storage ..."
    sleep 5
@@ -193,12 +193,12 @@ update_primary()
 
 install_remote()
 {
-ssh $PEER /devhub/fksdr/install.sh
-ssh $PEER /devhub/fksdr/velero.bin.v2 plugin add ljtbbt/fksdr-plugin:v2
-ssh $PEER /devhub/fksdr/velero.bin.v2 backup-location create tony-storagelocation --provider example.io/object-store-plugin --bucket velero-pvc --credential cloud-credentials=cloud
-ssh $PEER /devhub/fksdr/velero.bin.v2 snapshot-location create tony-snapshotlocation --provider example.io/volume-snapshotter-plugin
+ssh $PEER `pwd`/install_velero.sh
+ssh $PEER ../bin/velero plugin add ljtbbt/fksdr-plugin:v2
+ssh $PEER ../bin/velero backup-location create tony-storagelocation --provider example.io/object-store-plugin --bucket velero-pvc --credential cloud-credentials=cloud
+ssh $PEER ../bin/velero snapshot-location create tony-snapshotlocation --provider example.io/volume-snapshotter-plugin
 ssh $PEER kubectl create namespace vtest
-ssh $PEER kubectl -n velero patch deploy velero --patch "$(cat /devhub/fksdr/velero.deploy.json)"
+ssh $PEER kubectl -n velero patch deploy velero --patch "$(cat velero.deploy.json)"
 }
 
 prepare_remote()
@@ -211,7 +211,7 @@ setup_remote()
 # =================== recreate PVC on peer ===================
 ssh $PEER kubectl apply -f $PVF
 ssh $PEER kubectl apply -f $PVCF
-ssh $PEER 'kubectl -n velero patch deploy velero --patch "$(cat /devhub/fksdr/velero.deploy.json)"'
+ssh $PEER 'kubectl -n velero patch deploy velero --patch "$(cat velero.deploy.json)"'
 }
 
 restore()
@@ -234,7 +234,7 @@ echo
 pred "waiting for backup data loading ..."
 
 while true;do
-   READY=$(ssh $PEER /devhub/fksdr/velero.bin.v2 backup get | grep -c $BACKUP)
+   READY=$(ssh $PEER ../bin/velero backup get | grep -c $BACKUP)
    if [ $READY -eq 1 ];then
       break
    else
@@ -249,7 +249,7 @@ pause "start DR restore"
 #echo -n "Hit ENTER when you are ready to start DR restore: "
 #read ANSWER
 echo "starting restore ..."
-ssh $PEER /devhub/fksdr/velero.bin.v2 restore create --from-backup $BACKUP
+ssh $PEER ../bin/velero restore create --from-backup $BACKUP
 
 while true;do
    READY=$(ssh $PEER kubectl -n vtest get pod | grep -c "^nginx.*Running")

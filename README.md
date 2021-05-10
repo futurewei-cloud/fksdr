@@ -20,6 +20,9 @@ Procedure:
 3. Test and make sure PVC and replication works.
 
 =========== test script ============
+Before you start, clone this git repo to exact same path on one node of each clusters.
+FOr simplicity, recommend /root as root user.
+
 1. set up primary cluster using dr_setup
 2. create backup using dr_backup
 3. kick off failover using dr_failover

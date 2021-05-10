@@ -1,0 +1,27 @@
+{
+    "spec": {
+        "template": {
+            "spec": {
+                "containers": [
+                    {
+                        "name": "velero",
+                        "volumeMounts": [
+                            {
+                                "mountPath": "/velero-pvc",
+                                "name": "pvc-velero"
+                            }
+                        ]
+                    }
+                ],
+                "volumes": [
+                    {
+                        "name": "pvc-velero",
+                        "persistentVolumeClaim": {
+                            "claimName": "pvc-velero"
+                        }
+                    }
+                ]
+            }
+        }
+    }
+}
