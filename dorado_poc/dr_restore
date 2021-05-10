@@ -1,0 +1,7 @@
+#!/bin/bash
+
+. drlib
+
+sanity_check_cfg
+
+restore

@@ -1,0 +1,8 @@
+#!/bin/bash
+
+. drlib
+
+sanity_check_cfg
+
+stop_rep
+prepare_remote

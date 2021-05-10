@@ -1,0 +1,13 @@
+#!/bin/bash
+
+#set -e
+#set -x
+
+. dr_lib
+
+sanity_check_cfg
+
+update_primary
+start_rep 
+pred "waiting replication to be complete ..."
+sleep 20
