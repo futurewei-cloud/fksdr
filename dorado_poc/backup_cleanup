@@ -1,0 +1,5 @@
+#!/bin/bash
+
+kubectl -n velero exec -ti `kubectl -n velero get pod | grep "^velero" | awk '{print $1}'` -- /bin/bash -c 'rm -rf /velero-pvc/backups/*'
+for BACKUP in `../bin/velero backup get | grep vbackup | awk '{print $1}'`;do echo cleanup: $BACKUP;kubectl -n velero delete backup $BACKUP;done
+
