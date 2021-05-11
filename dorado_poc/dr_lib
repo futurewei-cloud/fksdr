@@ -169,28 +169,34 @@ sed -i "s/operation:.*/operation: Apply/g" $PVF
 
 start_rep()
 {
+echo > .start_rep
+chmod +x .start_rep
 while read REP;do
    #TODO: these REST commands will fail due to readonly access
    #rest_exec ${DORADO_A} REPLICATIONPAIR/$REP -d '{"SECRESACCESS":"2"}' 
    #rest_exec ${DORADO_A} REPLICATIONPAIR/sync -d "{\"ID\":\"${REP}\"}"
 
-   #TODO: remove these SSH commands after REST is fixed
-   drun ${DORADO_A} change remote_replication general remote_replication_id=${REP} second_res_access=read_only
-   drun ${DORADO_A} change remote_replication synchronize remote_replication_id=${REP}
+   #TODO: change to rest later
+   echo "sshpass -p Admin@storage6 ssh admin@${DORADO_A} change remote_replication general remote_replication_id=${REP} second_res_access=read_only 2>/dev/null" >> .start_rep
+   echo "sshpass -p Admin@storage6 ssh admin@${DORADO_A} change remote_replication synchronize remote_replication_id=${REP} 2>/dev/null" >> .start_rep
 done<.reps
+./.start_rep
 }
 
 stop_rep()
 {
+echo > .stop_rep
+chmod +x .stop_rep
 while read REP;do
    #TODO: these REST commands will fail due to readonly access
    #rest_exec ${DORADO_A} REPLICATIONPAIR/$REP -d '{"SECRESACCESS":"3"}' 
    #rest_exec ${DORADO_A} REPLICATIONPAIR/split -d "{\"ID\":\"${REP}\"}"
 
    #TODO: remove these SSH commands after REST is fixed
-   drun ${DORADO_A} change remote_replication split remote_replication_id=${REP}
-   drun ${DORADO_A} change remote_replication general remote_replication_id=${REP} second_res_access=read_write
+   echo "sshpass -p Admin@storage6 ssh admin@${DORADO_A} change remote_replication split remote_replication_id=${REP} 2>/dev/null" >> .stop_rep
+   echo "sshpass -p Admin@storage6 ssh admin@${DORADO_A} change remote_replication general remote_replication_id=${REP} second_res_access=read_write 2>/dev/null" >> .stop_rep
 done<.reps
+./.stop_rep
 }
 
 # Inject some new data into primary site POD
