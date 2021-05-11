@@ -20,7 +20,7 @@ sanity_check_file_exist()
 
 sanity_check_cfg()
 {
-sanity_check_file_exist $VELERO_BIN
+sanity_check_file_exist ../bin/velero
 
 if [ ! -f dr.cfg ];then
    echo "FATAL: can not locate DR configration file dr.cfg"
@@ -44,13 +44,16 @@ pause "proceed, or CTL-C to quit"
 # 4. Restore
 #
 
-#echo unique ID: $$
+if [ ! -f .uuid ];then
+    uuidgen > .uuid
+fi
+BACKUPID=$(cat .uuid)
 
-TMPDIR=${BASE}/tmp/$$
+TMPDIR=${BASE}/tmp/${BACKUPID}
 PVF=${BASE}/pv-dorado3.yaml
 PVCF=${BASE}/pvc-velero.yaml
 POD=nginx-dorado1-fs1
-BACKUP=vbackup-$$
+BACKUP=vbackup-${BACKUPID}
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -77,9 +80,25 @@ enter_velero()
    kubectl -n velero exec -ti `kubectl -n velero get pod | grep "^velero" | awk '{print $1}'` -- /bin/bash $@
 }
 
+drun_dev()
+{
+   DORADO=$1
+   shift
+   CMD="$@"
+   sshpass -p Storage@21st ssh ibc_os_hs@${DORADO} "$CMD" 2>/dev/null
+}
+
+drun()
+{
+   DORADO=$1
+   shift
+   CMD="$@"
+   sshpass -p Admin@storage6 ssh admin@${DORADO} "$CMD" 2>/dev/null
+}
+
 rest_cleanup()
 {
-   rm -f .${DORADO_A}* .${DORADO_B}*
+   rm -f .*.rest .*.session
 }
 
 _rest_login()
@@ -113,25 +132,32 @@ rest_exec()
    [ $# -lt 2 ] && return
    IP=$1;shift
    rest_login $IP
-   ./.${IP}.rest $@ 2>/dev/null | jq . | tee /tmp/.rest_response.$$
-   if [ "`cat /tmp/.rest_response.$$ | jq .error.code`" = "-401" ];then
+   #./.${IP}.rest $@ 2>/dev/null | jq .
+   ./.${IP}.rest $@ 2>/dev/null | jq . | tee /tmp/.rest_response.${BACKUPID}
+   if [ "`cat /tmp/.rest_response.${BACKUPID} | jq .error.code`" = "-401" ];then
       rm -f .${IP}*
    fi
-   rm -f /tmp/.rest_response.$$
+   rm -f /tmp/.rest_response.${BACKUPID}
 }
 
 get_rep_ids()
 {
-   rest_exec ${DORADO_A} REPLICATIONPAIR | grep -e \"ID\" -e  LOCALRESNAME > .all_reps.$$
+   rest_exec ${DORADO_A} REPLICATIONPAIR | grep -e \"ID\" -e  LOCALRESNAME > .all.reps
    
-   rm -f .reps.$$
+   rm -f .reps
    kubectl get pv | tail -n +2 | awk '{print $1}' | while read PV;do
       LUN=$(kubectl describe pv $PV | grep VolumeHandle | sed "s/^.*pvc-/pvc-/g;s/ *//g")
-      if [ `grep -c $LUN .all_reps.$$` -gt 0 ];then
-         REP=$(grep $LUN .all_reps.$$ -B 1 | head -1 | awk -F\" '{print $4}')
-         echo $REP >> .reps.$$
+      if [ `grep -c $LUN .all.reps` -gt 0 ];then
+         REP=$(grep $LUN .all.reps -B 1 | head -1 | awk -F\" '{print $4}')
+         echo $REP >> .reps
       fi
    done
+}
+
+get_stg_ips()
+{
+   rest_exec $DORADO_A eth_port | grep -e '"NAME"' -e "IPV4ADDR\": \"[1-9]" | sed '$!N;/\n.*MGMT/!P;D' | sed '$!N;/\n.*MAINTENANCE/!P;D' | grep IPV4ADDR | awk -F\" '{print $4}' > .ports.a
+   rest_exec $DORADO_B eth_port | grep -e '"NAME"' -e "IPV4ADDR\": \"[1-9]" | sed '$!N;/\n.*MGMT/!P;D' | sed '$!N;/\n.*MAINTENANCE/!P;D' | grep IPV4ADDR | awk -F\" '{print $4}' > .ports.b
 }
 
 generate_pv()
@@ -151,7 +177,7 @@ while read REP;do
    #TODO: remove these SSH commands after REST is fixed
    drun ${DORADO_A} change remote_replication general remote_replication_id=${REP} second_res_access=read_only
    drun ${DORADO_A} change remote_replication synchronize remote_replication_id=${REP}
-done<.reps.$$
+done<.reps
 }
 
 stop_rep()
@@ -164,7 +190,7 @@ while read REP;do
    #TODO: remove these SSH commands after REST is fixed
    drun ${DORADO_A} change remote_replication split remote_replication_id=${REP}
    drun ${DORADO_A} change remote_replication general remote_replication_id=${REP} second_res_access=read_write
-done<.reps.$$
+done<.reps
 }
 
 # Inject some new data into primary site POD
@@ -193,10 +219,10 @@ update_primary()
 
 install_remote()
 {
-ssh $PEER `pwd`/install_velero.sh
-ssh $PEER ../bin/velero plugin add ljtbbt/fksdr-plugin:v2
-ssh $PEER ../bin/velero backup-location create tony-storagelocation --provider example.io/object-store-plugin --bucket velero-pvc --credential cloud-credentials=cloud
-ssh $PEER ../bin/velero snapshot-location create tony-snapshotlocation --provider example.io/volume-snapshotter-plugin
+ssh $PEER `pwd`/install.sh
+ssh $PEER `pwd`/../bin/velero plugin add ljtbbt/fksdr-plugin:v2
+ssh $PEER `pwd`/../bin/velero backup-location create tony-storagelocation --provider example.io/object-store-plugin --bucket velero-pvc --credential cloud-credentials=cloud
+ssh $PEER `pwd`/../bin/velero snapshot-location create tony-snapshotlocation --provider example.io/volume-snapshotter-plugin
 ssh $PEER kubectl create namespace vtest
 ssh $PEER kubectl -n velero patch deploy velero --patch "$(cat velero.deploy.json)"
 }
@@ -234,7 +260,7 @@ echo
 pred "waiting for backup data loading ..."
 
 while true;do
-   READY=$(ssh $PEER ../bin/velero backup get | grep -c $BACKUP)
+   READY=$(ssh $PEER `pwd`/../bin/velero backup get | grep -c $BACKUP)
    if [ $READY -eq 1 ];then
       break
    else
@@ -249,7 +275,7 @@ pause "start DR restore"
 #echo -n "Hit ENTER when you are ready to start DR restore: "
 #read ANSWER
 echo "starting restore ..."
-ssh $PEER ../bin/velero restore create --from-backup $BACKUP
+ssh $PEER `pwd`/../bin/velero restore create --from-backup $BACKUP
 
 while true;do
    READY=$(ssh $PEER kubectl -n vtest get pod | grep -c "^nginx.*Running")

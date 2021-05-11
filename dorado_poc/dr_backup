@@ -8,6 +8,7 @@
 sanity_check_cfg
 
 update_primary
-start_rep 
+get_rep_ids
+#start_rep 
 pred "waiting replication to be complete ..."
 sleep 20

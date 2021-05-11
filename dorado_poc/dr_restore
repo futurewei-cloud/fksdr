@@ -1,7 +1,7 @@
 #!/bin/bash
 
-. drlib
+. dr_lib
 
-sanity_check_cfg
+#sanity_check_cfg
 
 restore
