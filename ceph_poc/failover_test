@@ -1,0 +1,57 @@
+#!/bin/bash
+#
+#                             MIT License
+#
+# Copyright (c) 2021 Futurewei Technologies Inc.
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+#
+
+
+
+#set -e
+#set -x
+
+. failover_lib
+
+echo Test set up unique ID: $$
+echo All generated k8s config files can be found in $TMPDIR
+echo
+
+# High level steps:
+# 1. Establish replication, wait for data to be mirrored
+# 2. Split mirror and mount velero PVC
+# 3. Install velero on peer
+# 4. Restore
+#
+
+# 1
+update_primary
+#start_rep 
+pred "waiting replication to be complete ..."
+sleep 20
+
+# 2
+stop_rep
+
+# 3 
+prepare_remote
+
+# 4
+restore
